@@ -1,0 +1,37 @@
+Is it possible to have multiple SGD's running in parallel in the loss landscape? (Similar to an SGD + PSO hybrid)
+Better important sampling methods for surrogate losses?
+For differentiable pathtracing, could we use surrogate losses instead of edge sampling?
+Can we borrow more ideas from computational physics?
+
+apprantly surrogate functions have been researched about in optimizations?
+
+Can we somehow fuse small networks that run in parallel? so we can optimize both at once???
+
+How can we explore lookaheads
+
+
+Small networks have more concerns with network depth than number of parameters, as GPU offers high throughput
+Non-gradient based optimizations don't fare well with high dimension data....
+
+multi objective optimizations? (neural appearance models seem to have thousands of smaller networks...)
+
+more sparse training or self training like the neural radiance cache?
+
+maybe self training for surrogates since it could be done with a pathtracing formulation?
+
+Oneshot training? idk if it works on general networks 
+
+sparse training also looks into this issue (sparse training with more aggresive learning rates?)
+ - belongs to a family of parallel/distributed training, which looks at the actual parallelization itself
+
+mixed precision training, quantized training
+
+
+
+data augmentation (doesnt improve speed for real time though)
+
+
+
+multiple sgd points interacting with each other?'
+
+
