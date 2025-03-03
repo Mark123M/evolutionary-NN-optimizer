@@ -1,3 +1,7 @@
+What is the best way to profile the training process?
+
+Can 
+
 Is it possible to have multiple SGD's running in parallel in the loss landscape? (Similar to an SGD + PSO hybrid)
 Better important sampling methods for surrogate losses?
 For differentiable pathtracing, could we use surrogate losses instead of edge sampling?
@@ -33,5 +37,17 @@ data augmentation (doesnt improve speed for real time though)
 
 
 multiple sgd points interacting with each other?'
+
+
+meta learning for smaller networks... 
+
+
+Can you use a better delay compensation approximation for smaller parameter networks????
+
+
+There's currently no asynchronous SGD on a single gpu, more for distributed training? maybe we could look into that *
+
+
+
 
 
