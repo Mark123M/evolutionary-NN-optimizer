@@ -51,3 +51,18 @@ There's currently no asynchronous SGD on a single gpu, more for distributed trai
 
 
 
+- Block based parameter updates
+- Validating answer every 5 epochs
+- Best to current heuristic
+- Exploration causes search to "swing" around the local minima
+- Fixed data generation
+- Weight regularization gives drastically different results?
+
+
+An asynchronous SGD can be seen as a scan algorithm? We compute W_t+1 = W_t + learning_rate * grad(W_t)
+
+Hmmmm, not really? Previous elements of SGD aren't known ahead of time... 
+
+We can potentially parallelize training over mini batches though????
+
+
