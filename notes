@@ -65,4 +65,10 @@ Hmmmm, not really? Previous elements of SGD aren't known ahead of time...
 
 We can potentially parallelize training over mini batches though????
 
+We can think of accumulating gradients from n batches as a scan operation? Maybe ASGD
+
+low arithmetic intensity?? 
+reduce kernel launches (fully fused)
+
+is there not a way to combine networks? like train multiple at the same time... 
 
