@@ -84,7 +84,7 @@ class DE_NN(nn.Module):
 
 epochs = 2000
 
-X = torch.rand(4000, 1).to(device) * 5 - 1
+X = torch.rand(40000, 1).to(device) * 5 - 1
 Y = gaussian_mixture(X).to(device)
 
 num_params = int(89 / 2)
