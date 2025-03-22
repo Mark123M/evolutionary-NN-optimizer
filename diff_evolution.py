@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+import torch.cuda.nvtx as nvtx
 from torchvision import datasets
 import matplotlib.pyplot as plt
 import math
@@ -45,11 +46,15 @@ class DE_NN(nn.Module):
             X = torch.relu(self.layers[k][self.best_model](X))
         return self.layers[self.layers_len - 1][self.best_model](X)  
     def step(self, id, X, Y, L, type='param'): # forward pass with candidate i
+        nvtx.range_push(f"candidate {id}")
+        nvtx.range_push("forward_pass1")
         fx = L(self.forward_i(X, id), Y)
         agent_ids = random.sample(range(0, self.NP), 3) # how to efficiently reject self? rej sampling?
+        nvtx.range_pop()
 
         R = random.randint(0, self.layers_len)
         for i in range(self.layers_len):
+            nvtx.range_push(f"updating layer {i}")
             ri = random.random()
             if ri < self.CR or i == R:
                 self.layers[i][NP].weight = torch.nn.Parameter(self.layers[i][id].weight + self.F * (self.layers[i][self.best_model].weight - self.layers[i][id].weight)
@@ -60,6 +65,7 @@ class DE_NN(nn.Module):
                 self.layers[i][NP].weight = torch.nn.Parameter(self.layers[i][id].weight)
                 self.layers[i][NP].bias = torch.nn.Parameter(self.layers[i][id].bias)
             self.layers[i][NP].weight *= 0.99 # this was wrong before...
+            nvtx.range_pop()
 
         fy = L(self.forward_i(X, NP), Y)
         if fy <= fx:
@@ -100,4 +106,4 @@ elif sys.argv[1] == 'chrome':
             print(model.min_l)
     prefix = f"{int(time.time())}"
     p.export_chrome_trace(f"chrome_trace_{prefix}.json.gz")
-    p.export_memory_timeline(f"chrome_memory_")
+    p.export_memory_timeline(f"chrome_memory_{prefix}.html")

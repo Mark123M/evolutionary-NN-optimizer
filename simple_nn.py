@@ -5,6 +5,9 @@ from torchvision import datasets
 import matplotlib.pyplot as plt
 import math
 import torch.profiler
+import sys
+import time
+import torch.cuda.nvtx as nvtx
 device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
 print(f"Using {device} device")
 torch.manual_seed(1122)
@@ -32,19 +35,36 @@ class SmallNN(nn.Module):
         return self.lin4(x)
 
 model = SmallNN().to(device)
+model = torch.compile(model, mode='default')
 L = nn.MSELoss().to(device)
-optimizer = torch.optim.SGD(model.parameters(), lr=0.3)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+epochs = 10
 
-epochs = 5 # low for profiling 
-
-X = torch.randn(1000, 1).to(device)
+X = torch.rand(4000, 1).to(device) * 5 - 1
 Y = gaussian_mixture(X).to(device)
 
-def training_step():
-    y_pred = model(X)
-    loss = L(y_pred, Y)
-    loss.backward()
-    optimizer.step()
-    optimizer.zero_grad()
+if sys.argv[1] == 'nsight':
+    for e in range(epochs):
+        nvtx.range_push(f"Epoch {e}")
+        nvtx.range_push("forward_pass")
+        y_pred = model(X)
+        loss = L(y_pred, Y)
+        nvtx.range_pop()
+        nvtx.range_push("backward_prop")
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+        nvtx.range_pop()
+        print(loss.item())
+        nvtx.range_pop()
+elif sys.argv[1] == 'chrome':
+    with torch.profiler.profile(record_shapes=True, profile_memory=True, with_stack=False) as p:
+        for e in range(epochs):
+            y_pred = model(X)
+            loss = L(y_pred, Y)
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+    prefix = f"Adam_{int(time.time())}"
+    p.export_chrome_trace(f"chrome_trace_{prefix}.json.gz")
 
-training_step()
