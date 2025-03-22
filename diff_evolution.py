@@ -26,30 +26,33 @@ def gaussian_mixture(x):
 class DE_NN(nn.Module):
     def __init__(self, NP, CR, F):
         super(DE_NN, self).__init__()
-        lin1s = nn.ModuleList([nn.Linear(1, 4) for i in range(NP + 1)])
-        lin2s = nn.ModuleList([nn.Linear(4, 8) for i in range(NP + 1)])
-        lin3s = nn.ModuleList([nn.Linear(8, 4) for i in range(NP + 1)])
-        lin4s = nn.ModuleList([nn.Linear(4, 1) for i in range(NP + 1)])
+        lin1s = nn.ModuleList([nn.Linear(1, 4) for i in range(NP)])
+        lin2s = nn.ModuleList([nn.Linear(4, 8) for i in range(NP)])
+        lin3s = nn.ModuleList([nn.Linear(8, 4) for i in range(NP)])
+        lin4s = nn.ModuleList([nn.Linear(4, 1) for i in range(NP)])
         self.layers = nn.ModuleList([lin1s, lin2s, lin3s, lin4s])
         self.layers_len = len(self.layers)
         self.NP = NP
         self.CR = CR
         self.F = F
-        self.min_l = torch.tensor(float("Inf")).to(device)
+        self.min_l = float('inf')
         self.best_model = 0
-    def forward_i(self, X, i): # a single pass
+    def forward_i(self, X, layers): # a single pass
         for k in range(self.layers_len - 1):
-            X = torch.relu(self.layers[k][i](X))
-        return self.layers[self.layers_len - 1][i](X)
+            X = torch.relu(layers[k](X))
+        return layers[self.layers_len - 1](X)
     def forward(self, X):
         for k in range(self.layers_len - 1):
             X = torch.relu(self.layers[k][self.best_model](X))
-        return self.layers[self.layers_len - 1][self.best_model](X)  
+        return self.layers[self.layers_len - 1][self.best_model](X)
     def step(self, id, X, Y, L, type='param'): # forward pass with candidate i
         nvtx.range_push(f"candidate {id}")
-        nvtx.range_push("forward_pass1")
-        fx = L(self.forward_i(X, id), Y)
+        nvtx.range_push("forward_1")
+        fx = L(self.forward_i(X, [l[id] for l in self.layers]), Y)
+        nvtx.range_pop()
         agent_ids = random.sample(range(0, self.NP), 3) # how to efficiently reject self? rej sampling?
+        nvtx.range_push(f"copy layers")
+        y = [copy.deepcopy(l[id]).to(device) for l in self.layers]
         nvtx.range_pop()
 
         R = random.randint(0, self.layers_len)
@@ -57,24 +60,29 @@ class DE_NN(nn.Module):
             nvtx.range_push(f"updating layer {i}")
             ri = random.random()
             if ri < self.CR or i == R:
-                self.layers[i][NP].weight = torch.nn.Parameter(self.layers[i][id].weight + self.F * (self.layers[i][self.best_model].weight - self.layers[i][id].weight)
+                y[i].weight = torch.nn.Parameter(self.layers[i][id].weight + self.F * (self.layers[i][self.best_model].weight - self.layers[i][id].weight)
                                                     + self.F * (self.layers[i][agent_ids[0]].weight - self.layers[i][agent_ids[1]].weight))
-                self.layers[i][NP].bias = torch.nn.Parameter(self.layers[i][id].bias + self.F * (self.layers[i][self.best_model].bias - self.layers[i][id].bias)
+                y[i].bias = torch.nn.Parameter(self.layers[i][id].bias + self.F * (self.layers[i][self.best_model].bias - self.layers[i][id].bias)
                                 + self.F * (self.layers[i][agent_ids[0]].bias - self.layers[i][agent_ids[1]].bias))
             else:
-                self.layers[i][NP].weight = torch.nn.Parameter(self.layers[i][id].weight)
-                self.layers[i][NP].bias = torch.nn.Parameter(self.layers[i][id].bias)
-            self.layers[i][NP].weight *= 0.99 # this was wrong before...
+                y[i].weight = torch.nn.Parameter(self.layers[i][id].weight)
+                y[i].bias = torch.nn.Parameter(self.layers[i][id].bias)
+            y[i].weight *= 0.99
             nvtx.range_pop()
+        nvtx.range_push("forward_2")
+        fy = L(self.forward_i(X, y), Y)
+        nvtx.range_pop()
 
-        fy = L(self.forward_i(X, NP), Y)
-        if fy <= fx:
+        nvtx.range_push("updating model")
+        if fy <= fx: 
             for k in range(self.layers_len):
-                self.layers[k][id], self.layers[k][NP] = self.layers[k][NP], self.layers[k][id]
+                self.layers[k][id] = y[k]
             fx = fy
         if fx < self.min_l:
             self.best_model = id
             self.min_l = fx
+        nvtx.range_pop()
+        nvtx.range_pop()
 
 epochs = 2000
 

@@ -40,7 +40,7 @@ L = nn.MSELoss().to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 epochs = 10
 
-X = torch.rand(4000, 1).to(device) * 5 - 1
+X = torch.rand(400000, 1).to(device) * 5 - 1
 Y = gaussian_mixture(X).to(device)
 
 if sys.argv[1] == 'nsight':
