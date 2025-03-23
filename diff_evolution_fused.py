@@ -13,7 +13,7 @@ from IPython.display import clear_output
 
 device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
 print(f"Using {device} device")
-torch.manual_seed(1122)
+torch.manual_seed(2244)
 
 theta = [0.1, 1, 1.8, 2]
 
@@ -64,8 +64,9 @@ class DE_NN(nn.Module):
         fx = L(self.forward_all(X, self.layers, self.biases), Y).mean(dim = 2)
         nvtx.range_pop()
         nvtx.range_push(f"copy layers")
-        y_layers = [self.layers[i].clone().detach() for i in range(len(self.layers))]
-        y_biases = [self.biases[i].clone().detach() for i in range(len(self.layers))]
+        y_layers = [self.layers[i].detach().clone() for i in range(len(self.layers))]
+        y_biases = [self.biases[i].detach().clone() for i in range(len(self.layers))]
+        nvtx.range_pop()
         
         for id in range(self.NP):
             agent_ids = random.sample(range(0, self.NP), 3) # how to efficiently reject self? rej sampling?
@@ -123,11 +124,10 @@ print(Y_pred.shape)
 
 print(sys.argv[1])
 if sys.argv[1] == 'nsight':
-    with torch.no_grad():
-        for e in range(epochs):
-            model.step(X, Y, L, 'block')
-            if e % 5 == 0:
-                print(model.min_l)
+    for e in range(epochs):
+        model.step(X, Y, L, 'block')
+        if e % 5 == 0:
+            print(model.min_l)
 elif sys.argv[1] == 'chrome':
     with torch.profiler.profile(record_shapes=True, profile_memory=True, with_stack=True) as p:
         model.step(X, Y, L, 'block')
