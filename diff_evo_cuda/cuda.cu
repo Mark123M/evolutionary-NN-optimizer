@@ -2,7 +2,28 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
+__device__ uint64_t mcg_state = 0xcafef00dd15ea5e5u;	// Must be odd
+
+__device__ uint32_t pcg32_fast() {
+	uint64_t x = mcg_state;
+	unsigned count = (unsigned)(x >> 61);	// 61 = 64 - 3
+
+	mcg_state = x * 6364136223846793005u;
+	x ^= x >> 22;
+	return (uint32_t)(x >> (22 + count));	// 22 = 32 - 3 - 7
+}
+
+void pcg32_fast_init(uint64_t seed) {
+	uint64_t host_state = 2 * seed + 1;
+    cudaMemcpyToSymbol(mcg_state, &host_state, sizeof(uint64_t));
+    std::cout << host_state << std::endl;
+}
+
 __global__ void de_crossover_kernel(int NP, int num_layers, float CR, float F, int best_model, float** d_layer_ptrs, float** d_bias_ptrs, float** d_out_layer_ptrs, float** d_out_bias_ptrs) {
+	int id = blockIdx.x * blockDim.x + threadIdx.x; // candidate id
+	for (int h = 0; h < 3; h++) {
+		uint32_t agent_id = pcg32_fast();
+	}
 	return;
 }
 
