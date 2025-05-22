@@ -2,10 +2,20 @@
 #include <torch/extension.h>
 #include <curand.h>
 
-__global__ void de_crossover_kernel(uint32_t NP, uint32_t CR, float F, uint32_t best_model, float* d_ptr, float* d_out_ptr, uint32_t size) {
-	int id = blockIdx.x * blockDim.x + threadIdx.x; // candidate id
+__global__ void de_crossover_kernel(uint32_t NP, uint32_t CR, float F, uint32_t best_model, float* d_ptr, float* d_out_ptr, uint32_t size, float* d_all_agent_ids, float* d_Rs, float* d_ris, int layer_idx, int num_layers) {
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-	return;
+	if (idx < NP * size) {
+		int id = idx / size; // candidate id
+		int agent_ids[3]{d_all_agent_ids[id * 3 + 0] * NP, d_all_agent_ids[id * 3 + 1] * NP, d_all_agent_ids[id * 3 + 2] * NP};
+		printf("id: %d, best model: %d, agent 0: %d, agent 1: %d\n", id, best_model, agent_ids[0], agent_ids[1]);
+		int R = d_Rs[id] * num_layers;
+		float ri = d_ris[layer_idx * NP + id];
+
+		if (ri < CR || layer_idx == R) {
+			d_out_ptr[idx] = d_ptr[idx] + F * (d_ptr[best_model * size + idx % size] - d_ptr[idx]) + F * (d_ptr[agent_ids[0] * size + idx % size] - d_ptr[agent_ids[1] * size + idx % size]);
+		}
+	}
 }
 
 std::vector<std::vector<torch::Tensor>> de_crossover_cuda(const std::vector<torch::Tensor>& layers, const std::vector<torch::Tensor>& biases, int64_t NP, double CR, double F, int64_t best_model) {
@@ -15,16 +25,16 @@ std::vector<std::vector<torch::Tensor>> de_crossover_cuda(const std::vector<torc
 	std::vector<float*> out_layer_ptrs(num_layers), out_bias_ptrs(num_layers);
 
 	curandGenerator_t gen;
-	float* d_agent_ids;
+	float* d_all_agent_ids;
 	float* d_Rs;
 	float* d_ris;
-	int num_agents = NP * 3, num_Rs = NP, num_ris = NP * num_layers;
-	cudaMalloc(&d_agent_ids, num_agents * sizeof(float));
+	int num_agents = NP * 3, num_Rs = NP, num_ris = num_layers * NP;
+	cudaMalloc(&d_all_agent_ids, num_agents * sizeof(float));
 	cudaMalloc(&d_Rs, num_Rs * sizeof(float));
 	cudaMalloc(&d_ris, num_ris * sizeof(float));
 	curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
 	curandSetPseudoRandomGeneratorSeed(gen, 1234ULL);
-	curandGenerateUniform(gen, d_agent_ids, num_agents);
+	curandGenerateUniform(gen, d_all_agent_ids, num_agents);
 	curandGenerateUniform(gen, d_Rs, num_Rs);
 	curandGenerateUniform(gen, d_ris, num_ris);
 
@@ -41,8 +51,8 @@ std::vector<std::vector<torch::Tensor>> de_crossover_cuda(const std::vector<torc
 		out_layer_ptrs[i] = out_layers[i].data_ptr<float>();
 		out_bias_ptrs[i] = out_biases[i].data_ptr<float>();
 
-		de_crossover_kernel<<<max(1l, layer_contig.numel() / 64), 64>>>(NP, CR, F, best_model, layer_ptrs[i], out_layer_ptrs[i], layer_contig.numel() / NP);
-		de_crossover_kernel<<<max(1l, bias_contig.numel() / 64), 64>>>(NP, CR, F, best_model, bias_ptrs[i], out_bias_ptrs[i], bias_contig.numel() / NP);
+		de_crossover_kernel<<<max(1l, layer_contig.numel() / 64), 64>>>(NP, CR, F, best_model, layer_ptrs[i], out_layer_ptrs[i], layer_contig.numel() / NP, d_all_agent_ids, d_Rs, d_ris, i, num_layers);
+		de_crossover_kernel<<<max(1l, bias_contig.numel() / 64), 64>>>(NP, CR, F, best_model, bias_ptrs[i], out_bias_ptrs[i], bias_contig.numel() / NP, d_all_agent_ids, d_Rs, d_ris, i, num_layers);
 		std::cout << "layer " << i << " has " << layer_contig.numel() / NP << " parameters" << std::endl;
 		std::cout << "bias  " << i << " has " << bias_contig.numel() / NP  << " parameters" << std::endl;
 	}
