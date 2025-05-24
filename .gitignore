@@ -174,5 +174,5 @@ cython_debug/
 .pypirc
 data
 
-traces
+notes
 *.ncu-rep
