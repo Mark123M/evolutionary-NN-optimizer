@@ -29,6 +29,7 @@ void curand_init() {
 	std::cout << "initializing curand" << std::endl;
 }
 
+int N = 64;
 std::vector<std::vector<torch::Tensor>> de_crossover_cuda(const std::vector<torch::Tensor>& layers, const std::vector<torch::Tensor>& biases, int64_t NP, double CR, double F, int64_t best_model) {
 	int num_layers = layers.size();
 	std::vector<float*> layer_ptrs(num_layers), bias_ptrs(num_layers);
@@ -62,13 +63,13 @@ std::vector<std::vector<torch::Tensor>> de_crossover_cuda(const std::vector<torc
 		out_layer_ptrs[i] = out_layers[i].data_ptr<float>();
 		out_bias_ptrs[i] = out_biases[i].data_ptr<float>();
 
-		de_crossover_kernel<<<max(1l, layer_contig.numel() / 64), 64>>>(NP, CR, F, best_model, layer_ptrs[i], out_layer_ptrs[i], layer_contig.numel() / NP, d_all_agent_ids, d_Rs, d_ris, i, num_layers);
-		de_crossover_kernel<<<max(1l, bias_contig.numel() / 64), 64>>>(NP, CR, F, best_model, bias_ptrs[i], out_bias_ptrs[i], bias_contig.numel() / NP, d_all_agent_ids, d_Rs, d_ris, i, num_layers);
+		de_crossover_kernel<<<max(1l, (layer_contig.numel() + N - 1) / N), N>>>(NP, CR, F, best_model, layer_ptrs[i], out_layer_ptrs[i], layer_contig.numel() / NP, d_all_agent_ids, d_Rs, d_ris, i, num_layers);
+		de_crossover_kernel<<<max(1l, (bias_contig.numel() + N - 1) / N), N>>>(NP, CR, F, best_model, bias_ptrs[i], out_bias_ptrs[i], bias_contig.numel() / NP, d_all_agent_ids, d_Rs, d_ris, i, num_layers);
 
-  		cudaDeviceSynchronize();
 		//std::cout << "layer " << i << " has " << layer_contig.numel() / NP << " parameters" << std::endl;
 		//std::cout << "bias  " << i << " has " << bias_contig.numel() / NP  << " parameters" << std::endl;
 	}
+   	cudaDeviceSynchronize();
 	cudaFree(d_all_agent_ids);
 	cudaFree(d_Rs);
 	cudaFree(d_ris);
