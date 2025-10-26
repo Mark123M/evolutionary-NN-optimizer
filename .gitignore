@@ -176,3 +176,7 @@ data
 
 notes
 *.ncu-rep
+*.nsys-rep
+*.sqlite
+*.html
+*.json.gz
