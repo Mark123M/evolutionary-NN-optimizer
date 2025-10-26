@@ -180,3 +180,5 @@ notes
 *.sqlite
 *.html
 *.json.gz
+references/
+traces/
